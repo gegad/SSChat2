@@ -1,0 +1,14 @@
+<!doctype html>
+<head></head>
+<body onload="onLoad()">
+</body>  
+<script>
+function onLoad() {
+    if (localStorage.getItem('accessToken') && localStorage.getItem('refreshToken')) {
+        window.location.pathname = 'chat'
+    } else {
+        window.location.pathname = 'login'
+    }
+}
+</script>  
+</html>

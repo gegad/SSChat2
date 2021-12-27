@@ -1,0 +1,79 @@
+<!doctype html>
+<head></head>
+<body onload="onLoad()">
+    <p id='msg'>SSChat Login page</p>
+    <form id="loginform">
+        <label for="username">Username:</label><br>
+        <input type="text" id="username" name="username" value=""><br>
+        <label for="desc">Password:</label><br>
+        <input type="password" id="password" name="password" value="">
+        <input type="button" value="Login" onclick="loginChat()"/><br>
+
+        <label for="desc">Repeat Password:</label><br>
+        <input type="password" id="password_rpt" name="repeat password" value="">        
+        <input type="button" value="Create Account" onclick="createUser()"/>
+    </form>
+</body>  
+<script>
+
+function onLoad() {
+    if (localStorage.getItem('accessToken') && localStorage.getItem('refreshToken')) {
+        window.location.pathname = 'chat'
+    }
+}
+
+async function loginChat() {
+    let user = document.getElementById("loginform").elements["username"].value;
+    let password = document.getElementById("loginform").elements["password"].value;
+
+    let body = JSON.stringify({
+            username: user,
+            password: password
+        });
+
+    let options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: body
+    };    
+    let url = 'http://localhost:5000/login/auth'
+    handleLoginResult(url, options);
+}
+
+async function createUser() {
+    let user = document.getElementById("loginform").elements["username"].value;
+    let password = document.getElementById("loginform").elements["password"].value;
+    let password2 = document.getElementById("loginform").elements["password_rpt"].value;
+
+    let body = JSON.stringify({
+            username: user,
+            password: password,
+            password2: password2
+        });
+
+    let options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: body,
+    };
+    let url = 'http://localhost:5000/login/register'
+    handleLoginResult(url, options);
+}
+
+async function handleLoginResult(url, options) {
+    let response = await fetch(url, options);
+    let result = await response.json();
+    if (result?.accessToken && result?.refreshToken) {
+        localStorage.setItem('accessToken', result.accessToken);
+        localStorage.setItem('refreshToken', result.refreshToken);
+        window.location.pathname = 'chat';
+    } else {
+        alert("Failed! Try again!");
+    }
+}
+</script>  
+</html>

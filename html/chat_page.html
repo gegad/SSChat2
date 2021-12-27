@@ -1,0 +1,162 @@
+<!doctype html>
+<head></head>
+<style>
+.chat {
+    border: 1px outset black;
+    background-color: lightgray;    
+    text-align: left;
+}
+</style>
+<body onload="onLoadChat()">
+    <p id='msg'>SSChat page</p>
+    <button id='logout' onclick="logout()">Logout</button>
+    <form method="post" id="chatform">
+        <input type="text" id="msg" name="msg" value="">
+        <input type="button" value="Send" onclick="onSend()"/>
+    </form>  
+    <div id="messages" class="chat"></div>  
+</body>
+<script>
+let chatConnection;
+
+function getCookie(name) {
+    try {
+        let cookie = document.cookie.split("; ").find((arg) => {return arg.split("=")[0] == name});
+        return cookie.split("=")[1];
+    } catch (error) {
+        return '';
+    }    
+}
+
+function onSend() {
+    let msg = document.getElementById("chatform").elements["msg"].value;
+    let date = new Date();
+    chatConnection.send(JSON.stringify({
+            event: 'msg',
+            data: {
+                date: date,
+                message: msg,
+                token: {
+                    accessToken: localStorage.getItem('accessToken'),
+                    refreshToken: localStorage.getItem('refreshToken'),
+                }
+            }
+            
+        }),
+    );
+}
+
+async function onLoadChat() {
+    if (localStorage.getItem('accessToken') && localStorage.getItem('refreshToken')) {
+        await loadChatMessages();
+        setupChatConnection();
+    } else {
+        window.location.pathname = 'login'
+    }
+}
+
+async function loadChatMessages() {
+    
+    let body = JSON.stringify({
+            accessToken: localStorage.getItem('accessToken'),
+            refreshToken: localStorage.getItem('refreshToken')
+        });
+
+    let options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: body
+    };
+    let response = await fetch('http://localhost:5000/chat/messages', options);
+    if (response.status == 403) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.pathname = 'login'
+    }
+    let msgData = await response.json();
+    updateMessages(msgData.messages);
+    if (msgData.token) {
+        localStorage.setItem('accessToken', msgData.token.accessToken);
+        localStorage.setItem('refreshToken', msgData.token.refreshToken);
+    }
+}
+
+function setupChatConnection() {
+    const urlParams = new URLSearchParams();
+    urlParams.set("acct", localStorage.getItem('accessToken'));
+    urlParams.set("reft", localStorage.getItem('refreshToken'));
+    let url = 'ws://localhost:5001?' + urlParams.toString();
+
+    chatConnection = new WebSocket(url);
+
+    chatConnection.addEventListener("open", (e) => {
+    });
+    
+    chatConnection.addEventListener("close", (e) => {
+        if (e.code == 4000) {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+        }
+    });
+
+    chatConnection.addEventListener("error", (error) => {
+        alert(`WebSocket error: ${error}`)
+    });
+
+    chatConnection.onmessage = (e) => {
+        let data = JSON.parse(e.data);
+        if (data?.accessToken && data?.refreshToken) {
+            localStorage.setItem("accessToken", data.accessToken);
+            localStorage.setItem("refreshToken", data.refreshToken);
+        } 
+        if (data?.message) {
+            updateMessages([data]);
+        }
+        if (data?.token) {
+
+        }
+    }
+}
+
+function updateMessages(messages) {
+    for (let msg of messages.reverse()) {
+        let date = new Date(msg.date);
+        try {
+            let msgLine = `${msg.user.name}: ${msg.message} (${date.toLocaleString()})`;
+            let messageElem = document.createElement('div');
+            messageElem.textContent = msgLine;
+            document.getElementById('messages').append(messageElem);
+        } catch (e) {
+            alert(e);
+        }
+    }
+}
+
+async function logout() {
+    let body = JSON.stringify({
+            accessToken: localStorage.getItem('accessToken'),
+            refreshToken: localStorage.getItem('refreshToken')
+        });
+
+    let options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: body
+    };
+    let response = await fetch('http://localhost:5000/chat/logout', options);
+    let result = await response.text();
+    if (result) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        chatConnection.close();
+        window.location.pathname = result;
+    } else {
+        alert("Logout failed. Try again.");
+    }
+}
+</script>
+</html>
